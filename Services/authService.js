@@ -10,6 +10,7 @@ import { signToken } from "../Utils/token.js";
 import sendSms from "../Utils/sendSMS.js";
 import { broadcastAdminUnreadCounts } from "../Controllers/adminNotificationController.js";
 import { getIo } from "../Utils/ioAccess.js";
+import { sendWelcomeNotification } from "../Utils/sendNotification.js";
 
 /**
  * Internal Auth Service

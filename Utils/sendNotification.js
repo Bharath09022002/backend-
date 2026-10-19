@@ -9,6 +9,7 @@ import DeviceToken from "../Schemas/DeviceToken.js";
 import Notification from "../Schemas/Notification.js";
 import { deactivateTokenByValue } from "./permissionService.js";
 import { getRedisClient, isRedisAvailable } from "./redisDedupe.js";
+import { getIo } from "./ioAccess.js";
 
 /**
  * 📢 NOTIFICATION UTILITY
@@ -607,3 +608,67 @@ export const notifyTechnicianWithFallback = async (io, technicianId, payload, cr
     return { success: false, error: error.message };
   }
 };
+
+/**
+ * Send welcome notification on new user signup or login (In-App DB + Live Socket + FCM Push)
+ */
+export const sendWelcomeNotification = async ({ userId, role = "Customer", isNewSignup = true, userName = "" }) => {
+  try {
+    if (!userId) return;
+    const greeting = userName ? ` ${userName}` : "";
+    const title = isNewSignup
+      ? "Welcome to RightTouch! 🎉"
+      : "Welcome Back! 👋";
+
+    const body = isNewSignup
+      ? `Welcome to the family of RightTouch${greeting}! Where your service is our priority.`
+      : `Welcome to the family of RightTouch${greeting}! Where your service is our priority.`;
+
+    const eventType = isNewSignup ? "WELCOME_SIGNUP" : "WELCOME_LOGIN";
+    const recipientType = (role || "Customer").toLowerCase();
+
+    // 1. Create In-App Notification in DB
+    await Notification.create({
+      recipientId: userId,
+      recipientType,
+      eventType,
+      title,
+      body,
+      data: {
+        type: "welcome",
+        route: "/notifications",
+      },
+      category: "general",
+    }).catch((e) => console.warn("Failed to create welcome in-app notification:", e.message));
+
+    // 2. Real-time Socket.IO emit
+    const io = getIo();
+    if (io) {
+      const userRoom = SOCKET_ROOMS.USER(userId);
+      io.to(userRoom).emit(SOCKET_EVENTS.NOTIFICATION_NEW, {
+        type: eventType,
+        title,
+        message: body,
+        body,
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    // 3. FCM Push Notification (if token exists)
+    sendPushNotification(
+      userId,
+      {
+        title,
+        body,
+        data: {
+          type: "welcome",
+          route: "/notifications",
+        },
+      },
+      { recipientType }
+    ).catch((e) => console.warn("Failed to dispatch welcome push:", e.message));
+  } catch (err) {
+    console.warn("sendWelcomeNotification warning:", err.message);
+  }
+};
+
