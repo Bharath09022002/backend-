@@ -155,7 +155,12 @@ const TEMPORARY_TOKEN_FAILURE_CODES = new Set([
 const isPermanentTokenFailure = (errorCode) => {
   if (!errorCode) return false;
   const code = String(errorCode).toLowerCase();
-  return PERMANENT_TOKEN_FAILURE_CODES.has(code);
+  return (
+    PERMANENT_TOKEN_FAILURE_CODES.has(code) ||
+    code.includes("not-registered") ||
+    code.includes("unregistered") ||
+    code.includes("invalid-registration")
+  );
 };
 
 const isTemporaryTokenFailure = (errorCode) => {
