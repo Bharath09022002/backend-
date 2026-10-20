@@ -632,19 +632,7 @@ export const sendWelcomeNotification = async ({ userId, role = "Customer", isNew
     const eventType = isNewSignup ? "WELCOME_SIGNUP" : "WELCOME_LOGIN";
     const recipientType = (role || "Customer").toLowerCase();
 
-    // 1. Create In-App Notification in DB
-    await Notification.create({
-      recipientId: userId,
-      recipientType,
-      eventType,
-      title,
-      body,
-      data: {
-        type: "welcome",
-        route: "/notifications",
-      },
-      category: "general",
-    }).catch((e) => console.warn("Failed to create welcome in-app notification:", e.message));
+    // (In-app database record intentionally skipped - Firebase Push Notification used directly)
 
     // 2. Real-time Socket.IO emit
     const io = getIo();
