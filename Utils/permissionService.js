@@ -326,7 +326,10 @@ export const hasNotificationPushAllowed = async ({ userId, role }) => {
   const normRole = normalizeRole(role);
   if (!normRole) return false;
   const docs = await Permission.find({ userId, role: normRole }).lean();
-  if (!docs.length) return false; // unknown → conservative: don't push until app reports
+  if (!docs.length) {
+    const activeToken = await DeviceToken.exists({ userId, isActive: true });
+    return Boolean(activeToken);
+  }
   return docs.some((d) => {
     const s = statusOf(d, "notification");
     return s === "granted" || s === "not_requested";
@@ -378,6 +381,23 @@ export const registerDeviceToken = async ({
   } else {
     await TechnicianProfile.updateOne({ userId }, { $addToSet: { fcmTokens: fcmToken } }).catch(() => {});
   }
+
+  // Auto-seed notification permission as granted when device registers FCM token
+  await Permission.findOneAndUpdate(
+    { userId, deviceId },
+    {
+      $setOnInsert: {
+        role: normRole,
+        platform: platform ? String(platform).toLowerCase() : "android",
+        lastSyncedAt: new Date(),
+      },
+      $set: {
+        "permissions.notification.status": "granted",
+        "permissions.notification.updatedAt": new Date(),
+      },
+    },
+    { upsert: true }
+  ).catch((err) => console.warn("[registerDeviceToken] Permission seed warn:", err.message));
 
   return { success: true };
 };

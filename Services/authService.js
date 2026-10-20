@@ -468,6 +468,14 @@ export const verifyOtpInternal = async ({ identifier, mobileNumber, otp, role })
         broadcastAdminUnreadCounts(getIo());
       }
 
+      // 🔔 Dispatch Welcome Notification (In-App + Socket + FCM)
+      sendWelcomeNotification({
+        userId: user._id,
+        role: record.role,
+        isNewSignup: true,
+        userName: [user.fname, user.lname].filter(Boolean).join(" ").trim(),
+      }).catch((e) => console.warn("Welcome notification error:", e.message));
+
       const tokenPayload = {
         userId: user._id,
         role: record.role,
@@ -553,6 +561,14 @@ export const verifyOtpInternal = async ({ identifier, mobileNumber, otp, role })
       // H4: bind the token to the current revocation generation.
       tokenVersion: user.tokenVersion ?? 0,
     });
+
+    // 🔔 Dispatch Welcome Notification (In-App + Socket + FCM)
+    sendWelcomeNotification({
+      userId: user._id,
+      role: user.role,
+      isNewSignup: false,
+      userName: [user.fname, user.lname].filter(Boolean).join(" ").trim(),
+    }).catch((e) => console.warn("Welcome notification error:", e.message));
 
     return {
       token,

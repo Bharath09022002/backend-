@@ -17,19 +17,31 @@ import {
  * existing push path keeps working. Notification permission is intentionally
  * NOT managed here — see the permission endpoints.
  */
+import { sendWelcomeNotification } from "../Utils/sendNotification.js";
+
 export const makeDeviceRouter = (allowedRole) => {
   const router = express.Router();
 
   const registerDeviceHandler = async (req, res) => {
     try {
       const { userId, role } = req.user;
-      const { deviceId, platform, fcmToken, appVersion } = req.body || {};
+      const { platform, appVersion } = req.body || {};
+      const fcmToken = (req.body?.fcmToken || req.body?.token || "").trim();
+      const deviceId = (req.body?.deviceId || "default").trim();
 
-      if (!deviceId || !fcmToken || typeof fcmToken !== "string" || fcmToken.length < 10) {
+      if (!deviceId || !fcmToken || fcmToken.length < 10) {
         return res.status(400).json({ success: false, message: "deviceId and valid fcmToken required", result: {} });
       }
 
       const result = await registerDeviceToken({ userId, role, deviceId, platform, fcmToken, appVersion });
+
+      // 🔔 Dispatch Welcome Push to the newly registered device
+      sendWelcomeNotification({
+        userId,
+        role,
+        isNewSignup: true,
+      }).catch((e) => console.warn("[deviceToken] Welcome push error:", e.message));
+
       return res.json({ success: true, message: "Device token registered", result });
     } catch (err) {
       return res.status(err.statusCode || 500).json({ success: false, message: err.message, result: {} });
@@ -39,7 +51,8 @@ export const makeDeviceRouter = (allowedRole) => {
   const unregisterDeviceHandler = async (req, res) => {
     try {
       const { userId, role } = req.user;
-      const { deviceId, fcmToken } = req.body || {};
+      const fcmToken = (req.body?.fcmToken || req.body?.token || "").trim();
+      const deviceId = req.body?.deviceId;
       if (!deviceId && !fcmToken) {
         return res.status(400).json({ success: false, message: "deviceId or fcmToken required", result: {} });
       }
